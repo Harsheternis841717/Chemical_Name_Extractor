@@ -625,12 +625,12 @@ def main():
                     st.dataframe(combined_results)
                     
                     # Download combined results
-                    csv = combined_results.to_csv(index=False).encode('utf-8')
+                    csv = combined_results.to_excel(index=False).encode('utf-8')
                     st.download_button(
                         label="Download Combined Results (CSV)",
                         data=csv,
                         file_name=f"batch_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv",
+                        mime="text/xlsx",
                     )
 
 if __name__ == "__main__":
