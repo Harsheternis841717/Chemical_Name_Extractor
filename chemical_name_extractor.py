@@ -136,6 +136,7 @@ def create_efficient_lookup(chemical_df_list, chemical_df_old):
 def extract_chemical_name_optimized(product_name, exact_lookup, token_lookup):
     """
     Optimized function to extract chemical names using pre-built lookup structures
+    with special handling for Hexyl Acetate
     """
     if not isinstance(product_name, str) or pd.isna(product_name):
         return None, None
@@ -145,23 +146,61 @@ def extract_chemical_name_optimized(product_name, exact_lookup, token_lookup):
     if not product_processed:
         return None, None
     
+    # Special case handling for Hexyl Acetate
+    # Check if the string is exactly "Hexyl Acetate" (ignoring case, spaces)
+    is_exact_hexyl_acetate = re.match(r'^\s*hexyl\s+acetate\s*$', product_processed, re.IGNORECASE) is not None
+    
+    # If it's not an exact match but contains "hexyl acetate" at the end, we'll flag it
+    contains_hexyl_acetate_at_end = re.search(r'hexyl\s+acetate\s*$', product_processed, re.IGNORECASE) is not None
+    
+    # Handle the special case for Hexyl Acetate
+    if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate:
+        # If hexyl acetate is at the end of a longer name, don't match it as Hexyl Acetate
+        # We'll continue with the lookup, but we'll exclude Hexyl Acetate from the possible matches
+        hexyl_acetate_standard = None
+        for key, value in exact_lookup.items():
+            if value.lower() == "hexyl acetate":
+                hexyl_acetate_standard = value
+                break
+    
     # Try direct exact matching first
     if product_processed in exact_lookup:
-        return exact_lookup[product_processed], "Exact"
+        proposed_match = exact_lookup[product_processed]
+        
+        # If it's not an exact "Hexyl Acetate" but contains it at the end, don't return Hexyl Acetate
+        if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate and proposed_match.lower() == "hexyl acetate":
+            pass  # Skip this match
+        else:
+            return proposed_match, "Exact"
     
     # Try matching without spaces or with hyphens
     no_spaces = product_processed.replace(' ', '')
     if no_spaces in exact_lookup:
-        return exact_lookup[no_spaces], "Variation"
+        proposed_match = exact_lookup[no_spaces]
+        
+        # Same check for Hexyl Acetate
+        if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate and proposed_match.lower() == "hexyl acetate":
+            pass  # Skip this match
+        else:
+            return proposed_match, "Variation"
     
     with_hyphens = product_processed.replace(' ', '-')
     if with_hyphens in exact_lookup:
-        return exact_lookup[with_hyphens], "Variation"
+        proposed_match = exact_lookup[with_hyphens]
+        
+        # Same check for Hexyl Acetate
+        if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate and proposed_match.lower() == "hexyl acetate":
+            pass  # Skip this match
+        else:
+            return proposed_match, "Variation"
     
     # Try substring matching for longer product names
     if len(product_processed) > 10:
         for exact_key, standard_name in exact_lookup.items():
             if len(exact_key) > 5 and exact_key in product_processed:
+                # Check if the standard name is Hexyl Acetate and we have our special case
+                if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate and standard_name.lower() == "hexyl acetate":
+                    continue  # Skip this match
                 return standard_name, "Substring"
     
     # Try token-based matching
@@ -172,6 +211,9 @@ def extract_chemical_name_optimized(product_name, exact_lookup, token_lookup):
         for token in tokens:
             if len(token) > 3 and token in token_lookup:
                 for chem in token_lookup[token]:
+                    # Skip Hexyl Acetate in our special case
+                    if contains_hexyl_acetate_at_end and not is_exact_hexyl_acetate and chem.lower() == "hexyl acetate":
+                        continue
                     chemical_matches[chem] += 1
         
         # Find the chemical with the most token matches
@@ -635,4 +677,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
